@@ -4,6 +4,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.Scanner;
 import java.util.regex.Matcher;
@@ -21,12 +22,16 @@ public class Main {
     private final String vfsPath;
     private final String scriptPath;
     private final String vfsName;
+    private final Vfs vfs;
     private boolean running;
 
     public Main(String vfsPath, String scriptPath) {
         this.vfsPath = vfsPath;
         this.scriptPath = scriptPath;
-        if (vfsPath != null && !vfsPath.isEmpty()) {
+        this.vfs = loadVfs(vfsPath);
+        if (this.vfs != null) {
+            this.vfsName = this.vfs.getName();
+        } else if (vfsPath != null && !vfsPath.isEmpty()) {
             this.vfsName = new File(vfsPath).getName();
         } else {
             this.vfsName = DEFAULT_VFS;
@@ -50,8 +55,29 @@ public class Main {
         app.start();
     }
 
+    private Vfs loadVfs(String path) {
+        if (path == null || path.isEmpty()) {
+            return null;
+        }
+        File file = new File(path);
+        if (!file.exists()) {
+            System.err.println("error: vfs file not found: " + path);
+            return null;
+        }
+        try {
+            byte[] bytes = Files.readAllBytes(file.toPath());
+            return new Vfs(file.getName(), bytes);
+        } catch (IOException e) {
+            System.err.println("error: invalid vfs archive format: " + path);
+            return null;
+        }
+    }
+
     public void start() {
         printDebugParams();
+        if (vfs != null) {
+            vfs.printMotd();
+        }
         if (scriptPath != null) {
             runScript(scriptPath);
         }
@@ -144,6 +170,8 @@ public class Main {
         switch (command) {
             case "exit":
                 return handleExit(args);
+            case "vfs-info":
+                return handleVfsInfo(args);
             case "ls":
                 return handleLs(args);
             case "cd":
@@ -160,6 +188,20 @@ public class Main {
             return false;
         }
         this.running = false;
+        return true;
+    }
+
+    private boolean handleVfsInfo(String[] args) {
+        if (args.length > ZERO) {
+            System.err.println("error: vfs-info takes no arguments");
+            return false;
+        }
+        if (vfs == null) {
+            System.err.println("error: no vfs loaded");
+            return false;
+        }
+        System.out.println("vfs: " + vfs.getName());
+        System.out.println("sha256: " + vfs.getSha256Hex());
         return true;
     }
 
