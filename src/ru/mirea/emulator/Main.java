@@ -4,8 +4,12 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.Scanner;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -176,6 +180,12 @@ public class Main {
                 return handleLs(args);
             case "cd":
                 return handleCd(args);
+            case "cat":
+                return handleCat(args);
+            case "find":
+                return handleFind(args);
+            case "uname":
+                return handleUname(args);
             default:
                 System.err.println("error: unknown command '" + command + "'");
                 return false;
@@ -206,16 +216,118 @@ public class Main {
     }
 
     private boolean handleLs(String[] args) {
-        System.out.println("stub: ls executed with args " + Arrays.toString(args));
+        if (vfs == null) {
+            System.err.println("error: no vfs loaded");
+            return false;
+        }
+        if (args.length > ONE) {
+            System.err.println("error: ls takes at most 1 argument");
+            return false;
+        }
+        String targetPath = (args.length == ZERO) ? vfs.getCurrentPath() : args[ZERO];
+        VfsNode node = vfs.resolve(targetPath);
+        if (node == null) {
+            System.err.println("error: ls: cannot access '" + targetPath + "': no such file or directory");
+            return false;
+        }
+        if (!node.isDirectory()) {
+            System.out.println(node.getName());
+            return true;
+        }
+        List<String> names = new ArrayList<>(node.getChildren().keySet());
+        Collections.sort(names);
+        for (String name : names) {
+            System.out.println(name);
+        }
         return true;
     }
 
     private boolean handleCd(String[] args) {
+        if (vfs == null) {
+            System.err.println("error: no vfs loaded");
+            return false;
+        }
         if (args.length > ONE) {
             System.err.println("error: cd takes at most 1 argument");
             return false;
         }
-        System.out.println("stub: cd executed with args " + Arrays.toString(args));
+        String targetPath = (args.length == ZERO) ? "/" : args[ZERO];
+        VfsNode node = vfs.resolve(targetPath);
+        if (node == null) {
+            System.err.println("error: cd: no such file or directory: " + targetPath);
+            return false;
+        }
+        if (!node.isDirectory()) {
+            System.err.println("error: cd: not a directory: " + targetPath);
+            return false;
+        }
+        List<String> segments = vfs.normalizePathSegments(targetPath);
+        vfs.setCurrentPath(vfs.toPathString(segments));
+        return true;
+    }
+
+    private boolean handleCat(String[] args) {
+        if (vfs == null) {
+            System.err.println("error: no vfs loaded");
+            return false;
+        }
+        if (args.length == ZERO) {
+            System.err.println("error: cat: missing operand");
+            return false;
+        }
+        boolean ok = true;
+        for (String path : args) {
+            VfsNode node = vfs.resolve(path);
+            if (node == null) {
+                System.err.println("error: cat: " + path + ": no such file or directory");
+                ok = false;
+            } else if (node.isDirectory()) {
+                System.err.println("error: cat: " + path + ": is a directory");
+                ok = false;
+            } else {
+                System.out.println(new String(node.getData(), StandardCharsets.UTF_8));
+            }
+        }
+        return ok;
+    }
+
+    private boolean handleFind(String[] args) {
+        if (vfs == null) {
+            System.err.println("error: no vfs loaded");
+            return false;
+        }
+        if (args.length > ONE) {
+            System.err.println("error: find takes at most 1 argument");
+            return false;
+        }
+        String targetPath = (args.length == ZERO) ? "." : args[ZERO];
+        VfsNode startNode = vfs.resolve(targetPath);
+        if (startNode == null) {
+            System.err.println("error: find: '" + targetPath + "': no such file or directory");
+            return false;
+        }
+        printFindTree(startNode, targetPath);
+        return true;
+    }
+
+    private void printFindTree(VfsNode node, String currentDisplay) {
+        System.out.println(currentDisplay);
+        if (!node.isDirectory()) {
+            return;
+        }
+        List<String> names = new ArrayList<>(node.getChildren().keySet());
+        Collections.sort(names);
+        for (String childName : names) {
+            VfsNode childNode = node.getChildren().get(childName);
+            String childDisplay = currentDisplay.endsWith("/")
+                    ? currentDisplay + childName
+                    : currentDisplay + "/" + childName;
+            printFindTree(childNode, childDisplay);
+        }
+    }
+
+    private boolean handleUname(String[] args) {
+        System.out.println("Linux vfs-emulator 6.8.0-generic x86_64 GNU/Linux");
         return true;
     }
 }

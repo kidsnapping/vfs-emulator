@@ -6,6 +6,8 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -23,6 +25,7 @@ public class Vfs {
     private final String name;
     private final String sha256Hex;
     private final VfsNode root;
+    private String currentPath;
 
     public Vfs(String name, byte[] zipBytes) throws IOException {
         if (!isValidZipHeader(zipBytes)) {
@@ -31,6 +34,7 @@ public class Vfs {
         this.name = name;
         this.sha256Hex = calculateSha256(zipBytes);
         this.root = new VfsNode(ROOT_NAME, true);
+        this.currentPath = ROOT_NAME;
         loadZipEntries(zipBytes);
     }
 
@@ -113,6 +117,14 @@ public class Vfs {
         return root;
     }
 
+    public String getCurrentPath() {
+        return currentPath;
+    }
+
+    public void setCurrentPath(String currentPath) {
+        this.currentPath = currentPath;
+    }
+
     public void printMotd() {
         VfsNode motdNode = root.getChildren().get(MOTD_NAME);
         if (motdNode != null && !motdNode.isDirectory()) {
@@ -121,5 +133,55 @@ public class Vfs {
                 System.out.println(text);
             }
         }
+    }
+
+    public List<String> normalizePathSegments(String path) {
+        List<String> segments = new ArrayList<>();
+        if (!path.startsWith("/")) {
+            String[] currentParts = currentPath.split("/");
+            for (String part : currentParts) {
+                if (!part.isEmpty()) {
+                    segments.add(part);
+                }
+            }
+        }
+        String[] parts = path.split("/");
+        for (String part : parts) {
+            if (part.isEmpty() || ".".equals(part)) {
+                continue;
+            }
+            if ("..".equals(part)) {
+                if (!segments.isEmpty()) {
+                    segments.remove(segments.size() - ONE);
+                }
+            } else {
+                segments.add(part);
+            }
+        }
+        return segments;
+    }
+
+    public VfsNode resolve(String path) {
+        List<String> segments = normalizePathSegments(path);
+        VfsNode current = root;
+        for (String segment : segments) {
+            VfsNode next = current.getChildren().get(segment);
+            if (next == null) {
+                return null;
+            }
+            current = next;
+        }
+        return current;
+    }
+
+    public String toPathString(List<String> segments) {
+        if (segments.isEmpty()) {
+            return ROOT_NAME;
+        }
+        StringBuilder sb = new StringBuilder();
+        for (String seg : segments) {
+            sb.append("/").append(seg);
+        }
+        return sb.toString();
     }
 }

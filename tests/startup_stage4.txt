@@ -1,0 +1,27 @@
+// Тестирование uname
+uname
+// Тестирование ls и cd
+ls
+cd level1
+ls
+cd level2
+ls
+// Тестирование cat
+cat mid.txt
+cd level3
+cat deep.txt
+// Тестирование возврата через  ..
+cd ..
+cd ..
+ls
+// Тестирование find
+find
+find level2
+// Проверка ошибок cat, cd, ls, find
+cat level1 // ошибка: это директория
+cat missing.txt // ошибка: файл не найден
+cd missing_dir // ошибка: директория не найдена
+cd top.txt // ошибка: это файл, а не директория
+ls non_existing // ошибка: путь не существует
+find non_existing // ошибка: путь не существует
+exit
