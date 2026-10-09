@@ -1,0 +1,5 @@
+ls -l
+cd $HOME
+ls
+random_command_123
+exit
